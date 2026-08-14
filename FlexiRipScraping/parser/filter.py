@@ -1,30 +1,19 @@
-def filtrar_campos(registros, claves):
-    filtrados = []
-
-    for r in registros:
-        nuevo = {k: v for k, v in r.items() if k in claves}
-        filtrados.append(nuevo)
-
-    return filtrados        
+def filtrar_campos(objetos, campos):
+    """Devuelve una lista de dicts con los campos pedidos de cada objeto."""
+    return [{c: getattr(o, c, None) for c in campos} for o in objetos]
 
 
-def campos_importantes(registros):
-    claves_fijas = {
-        'evento',
-        'archivo',
-        'tipo_de_trabajo',
-        'dimensión',
-        'resolución',
-        'número_de_copias',
-        'fecha_de_envío',
-        'fecha_y_hora_de_inicio_de_la_salida',
-        'fecha_y_hora_de_finalización_de_la_salida',
-        'duración_de_la_salida',
-        'tipo_archivo',
-        'perfil_icc_de_salida',
-        'fecha_y_hora_de_inicio_de_rip',
-        'info',
-        'fecha_y_hora_de_finalización_de_rip',
-        'duración_de_rip',
-    }
-    return filtrar_campos(registros, claves_fijas)
+def campos_importantes(objetos):
+    claves_fijas = [
+        "tipo",
+        "impresora",
+        "archivo",
+        "tipo_trabajo",
+        "dimension",
+        "resolucion",
+        "fecha_envio",
+        "fecha_inicio",
+        "fecha_fin",
+        "duracion",
+    ]
+    return filtrar_campos(objetos, claves_fijas)

@@ -1,6 +1,7 @@
-from pathlib import Path
-from bs4 import BeautifulSoup #Lib para Scrapear
+from lxml import html
+
 
 def cargar_html(ruta):
-    texto = Path(ruta).read_text(encoding="utf-8", errors="ignore")
-    return BeautifulSoup(texto, "lxml")
+    parser = html.HTMLParser(encoding="utf-8")
+    doc = html.parse(ruta, parser)
+    return doc.getroot()
