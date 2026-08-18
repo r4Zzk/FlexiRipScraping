@@ -1,6 +1,6 @@
 import sqlite3
 
-from config import RUTA_DB
+from config import DATABASE_FILE
 
 ESQUEMA = """
 CREATE TABLE IF NOT EXISTS registros (
@@ -28,8 +28,8 @@ CREATE TABLE IF NOT EXISTS registros (
 
 
 def obtener_conexion():
-    RUTA_DB.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(RUTA_DB)
+    DATABASE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DATABASE_FILE)
     conn.row_factory = sqlite3.Row
     return conn
 

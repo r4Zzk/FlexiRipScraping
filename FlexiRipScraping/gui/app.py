@@ -1,8 +1,9 @@
+import sys
 from tkinter import ttk
 
 import customtkinter as ctk
 
-from config import FUENTES
+from config import FUENTES, resource_path
 from services.sync_service import sincronizar
 from services.search_service import buscar, contar
 
@@ -33,10 +34,28 @@ class App(ctk.CTk):
         self.geometry("1200x600")
         self.minsize(900, 400)
 
+        self._cargar_icono()
         self._crear_barra_busqueda()
         self._crear_tabla()
         self.lbl_estado = ctk.CTkLabel(self, text="")
         self.lbl_estado.pack(pady=(0, 10))
+
+    def _cargar_icono(self):
+        png = resource_path("assets/icon.png")
+        if png.exists():
+            try:
+                import tkinter as tk
+
+                self._icono_tk = tk.PhotoImage(file=str(png))
+                self.iconphoto(True, self._icono_tk)
+            except Exception:
+                pass
+        ico = resource_path("assets/icon.ico")
+        if ico.exists() and sys.platform == "win32":
+            try:
+                self.iconbitmap(str(ico))
+            except Exception:
+                pass
 
     def _crear_barra_busqueda(self):
         frame = ctk.CTkFrame(self)

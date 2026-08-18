@@ -8,15 +8,16 @@ buscarlos desde una interfaz gráfica.
 
 - 4 máquinas de impresión generan su propio `RIPLOG.HTML` (se comparte por red, solo lectura).
 - La 5ª máquina corre esta app: lee cada RIPLOG por red, parsea los eventos, los normaliza
-  y los guarda en `data/database.db`. **Solo lectura**: no mueve ni borra los archivos de origen.
+  y los guarda en SQLite. **Solo lectura**: no mueve ni borra los archivos de origen.
 - Los archivos se limpian/mueven manualmente en cada máquina cuando sea necesario.
 
 ## Estructura
 
 ```
 FlexiRipScraping/
-├── main.py              ← lanza la GUI
-├── config.py            ← rutas y mapeos (config.json externo PENDIENTE)
+├── main.py              ← lanza la GUI (crea la base si no existe)
+├── config.py            ← rutas persistentes + carga de config.txt
+├── assets/              ← icon.png (GUI) e icon.ico (ejecutable)
 ├── gui/                 ← interfaz (CustomTkinter)
 ├── parser/              ← html_reader, extractor, normalizer, filter
 ├── database/            ← connection, queries (SQLite)
@@ -24,60 +25,79 @@ FlexiRipScraping/
 └── models.py            ← objetos TrabajoRip / SalidaImpresion
 ```
 
+## Datos persistentes del usuario
+
+La configuración y la base de datos **NO** viven en la carpeta del programa
+(soporta instalación en `Program Files` y actualizaciones sin perder nada):
+
+```
+Windows:  %LOCALAPPDATA%\FlexiRipScraping\
+Linux:    ~/.config/FlexiRipScraping/
+
+├── config.txt    ← se crea solo la primera vez (nunca se sobrescribe)
+└── database.db   ← se crea solo al arrancar (tabla registros)
+```
+
+### config.txt (formato JSON)
+
+```json
+{
+  "FUENTES": ["\\\\MAQUINA1\\logs\\RIPLOG.HTML", "D:\\Logs\\RIPLOG.HTML"],
+  "EMISOR_MAQUINAS": {
+    "maqui": "Maquina 4",
+    "202502": "Maquina 3",
+    "maquina": "Maquina 1",
+    "user": "Maquina 2"
+  }
+}
+```
+
+- `FUENTES` → rutas del `RIPLOG.HTML` de cada máquina (local o UNC). Vacío = sin fuentes.
+- `EMISOR_MAQUINAS` → mapea el emisor del log al nombre de máquina. Si un emisor
+  no está mapeado, se guarda tal cual.
+- El archivo se lee en UTF-8 al iniciar; si falta, se crea con los valores
+  predeterminados. Editar a mano las rutas reales.
+
 ## Base de datos
 
-- SQLite en `data/database.db`
+- SQLite en `%LOCALAPPDATA%\FlexiRipScraping\database.db`
 - Tabla `registros` con anti-duplicados: `UNIQUE(tipo, archivo, fecha_inicio)` + `INSERT OR IGNORE`
 - Índices: `archivo`, `fecha_envio`, `tipo`
 
-## Configuración (antes de producción)
-
-`config.py`:
-- `FUENTES` → rutas del `RIPLOG.HTML` de cada máquina (local o UNC `\\MAQUINA\carpeta\RIPLOG.HTML`)
-- `EMISOR_MAQUINAS` → mapea el emisor del log al nombre de máquina
-  (ej: `"maqui"` → `"Maquina 4"`). Si no matchea, se guarda el valor original.
-
-**PENDIENTE**: mover `FUENTES` y `EMISOR_MAQUINAS` a un `config.json` externo
-(se lee al iniciar) para no tener que recompilar el `.exe` cuando cambien las rutas.
-
-## Paso a paso para producción
-
-### Paso 1 — Preparar el código (en desarrollo)
-
-Sacar `FUENTES` y `EMISOR_MAQUINAS` a un `config.json` externo para no recompilar
-el exe ante cambios de rutas. (PENDIENTE)
-
-### Paso 2 — Generar el `.exe` (en una PC con Windows)
+## Generar el `.exe` (en una PC con Windows)
 
 ```
 pip install -r requirements.txt pyinstaller
-pyinstaller --onefile --windowed --name FlexiRip main.py
+pyinstaller FlexiRipScraping.spec
 ```
 
-Queda en `dist\FlexiRip.exe`.
+Modo `onedir`: queda en `dist\FlexiRipScraping\FlexiRipScraping.exe`.
+Los assets se empaquetan y se resuelven con `resource_path()` (config.py).
 
-### Paso 3 — Instalar en la máquina 5
+## Instalación en la máquina 5
 
 ```
-C:\FlexiRip\
-├── FlexiRip.exe
-├── config.json          ← las rutas de red y máquinas (se edita a mano)
-└── data\                ← se crea sola (database.db)
+C:\Program Files\FlexiRipScraping\
+└── FlexiRipScraping.exe          ← programa (no escribe nada acá)
+
+C:\Users\Usuario\AppData\Local\FlexiRipScraping\
+├── config.txt                    ← rutas de red + máquinas (editar a mano)
+└── database.db                   ← se crea sola
 ```
 
-### Paso 4 — Configurar las 4 máquinas de impresión
+### Configurar las 4 máquinas de impresión
 
 - Compartir la carpeta del RIPLOG (solo lectura).
 - Verificar desde la máquina 5: `\\MAQUINA1\...\RIPLOG.HTML`.
-- Editar `config.json` con las 4 rutas UNC.
+- Editar `config.txt` con las 4 rutas UNC.
 
-### Paso 5 — Probar
+### Probar
 
-- Doble clic en `FlexiRip.exe` → "Escanear" → deberían aparecer los registros.
-- Acceso directo en el escritorio para el día a día.
+- Doble clic en `FlexiRipScraping.exe` → "Escanear" → deberían aparecer los registros.
+- Al actualizar/desinstalar el programa, `config.txt` y `database.db` se conservan.
 
 ## Dependencias
 
-`beautifulsoup4`, `lxml`, `customtkinter` (ver `requirements.txt`).
-Nota: el parseo usa `lxml` directo (más rápido que BeautifulSoup); `beautifulsoup4`
-quedó como dependencia histórica.
+`lxml`, `customtkinter` (ver `requirements.txt`).
+`sqlite3` es parte de la biblioteca estándar (no va en requirements).
+`pyinstaller` y `pillow` son herramientas de build/desarrollo (no las usa el usuario final).
