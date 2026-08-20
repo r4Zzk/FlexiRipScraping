@@ -39,3 +39,16 @@ def contar():
     fila = conn.execute("SELECT COUNT(*) AS total FROM registros").fetchone()
     conn.close()
     return fila["total"]
+
+
+def eliminar_registros(ids):
+    """Elimina registros por lista de IDs. Retorna cantidad eliminada."""
+    if not ids:
+        return 0
+    conn = obtener_conexion()
+    placeholders = ",".join("?" for _ in ids)
+    with conn:
+        cursor = conn.execute(f"DELETE FROM registros WHERE id IN ({placeholders})", ids)
+        eliminados = cursor.rowcount
+    conn.close()
+    return eliminados

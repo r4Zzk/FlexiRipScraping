@@ -179,6 +179,9 @@ class ThemeManager:
         app.btn_escanear.configure(
             fg_color=primary, hover_color=primary_h, text_color=text,
         )
+        app.btn_eliminar.configure(
+            fg_color="#8B0000", hover_color="#A52A2A", text_color="#FFFFFF",
+        )
         app.combo_maquina.configure(
             fg_color=surface, border_color=border,
             button_color=primary, button_hover_color=primary_h,

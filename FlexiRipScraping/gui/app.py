@@ -7,7 +7,7 @@ import customtkinter as ctk
 
 from config import FUENTES, resource_path, EMISOR_MAQUINAS
 from services.sync_service import sincronizar
-from services.search_service import buscar, contar
+from services.search_service import buscar, contar, eliminar_registros
 from theme_manager import ThemeManager
 
 ctk.set_appearance_mode("dark")
@@ -89,6 +89,13 @@ class App(ctk.CTk):
         self.btn_escanear = ctk.CTkButton(self.frame_busqueda, text="Escanear", width=90, command=self.escanear)
         self.btn_escanear.pack(side="left")
 
+        self.btn_eliminar = ctk.CTkButton(
+            self.frame_busqueda, text="Eliminar", width=90,
+            fg_color="#8B0000", hover_color="#A52A2A",
+            command=self.eliminar_seleccion,
+        )
+        self.btn_eliminar.pack(side="left", padx=(10, 0))
+
     def _crear_filtros(self):
         self.frame_filtros = ctk.CTkFrame(self)
         self.frame_filtros.pack(fill="x", padx=10, pady=(5, 0))
@@ -153,8 +160,11 @@ class App(ctk.CTk):
         self.frame_tabla = ctk.CTkFrame(self)
         self.frame_tabla.pack(fill="both", expand=True, padx=10, pady=(5, 10))
 
-        ids = [c[0] for c in COLUMNAS]
+        ids = ["_id"] + [c[0] for c in COLUMNAS]
         self.tabla = ttk.Treeview(self.frame_tabla, columns=ids, show="headings")
+
+        self.tabla.column("_id", width=0, stretch=False)
+        self.tabla.heading("_id", text="")
 
         for cid, texto, ancho in COLUMNAS:
             self.tabla.heading(cid, text=texto, command=lambda c=cid: self._ordenar_por(c))
@@ -207,6 +217,38 @@ class App(ctk.CTk):
 
         threading.Thread(target=_ejecutar, daemon=True).start()
 
+    def eliminar_seleccion(self):
+        seleccion = self.tabla.selection()
+        if not seleccion:
+            self.lbl_estado.configure(text="No hay registros seleccionados")
+            return
+
+        cantidad = len(seleccion)
+        from tkinter import messagebox
+        confirmar = messagebox.askyesno(
+            "Confirmar eliminación",
+            f"¿Eliminar {cantidad} registro{'s' if cantidad > 1 else ''}?\n\nEsta acción no se puede deshacer.",
+        )
+        if not confirmar:
+            return
+
+        ids = [int(self.tabla.item(item, "values")[0]) for item in seleccion]
+
+        self.lbl_estado.configure(text="Eliminando...")
+        self.btn_eliminar.configure(state="disabled")
+        self.update_idletasks()
+
+        def _ejecutar():
+            eliminados = eliminar_registros(ids)
+            self._programar(lambda: self._post_eliminar(eliminados))
+
+        threading.Thread(target=_ejecutar, daemon=True).start()
+
+    def _post_eliminar(self, eliminados):
+        self.btn_eliminar.configure(state="normal")
+        self.lbl_escaneo.configure(text=f"Eliminados: {eliminados} registros")
+        self.buscar()
+
     def buscar(self):
         if self._busqueda_en_curso:
             return
@@ -239,7 +281,7 @@ class App(ctk.CTk):
 
         self.tabla.delete(*self.tabla.get_children())
         for i, f in enumerate(filas):
-            valores = []
+            valores = [f.get("id")]
             for cid, _texto, _ancho in COLUMNAS:
                 v = f.get(cid)
                 if cid == "tipo":
