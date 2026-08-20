@@ -184,6 +184,11 @@ class ThemeManager:
             button_color=primary, button_hover_color=primary_h,
             text_color=text,
         )
+        app.combo_tipo.configure(
+            fg_color=surface, border_color=border,
+            button_color=primary, button_hover_color=primary_h,
+            text_color=text,
+        )
         app.entry_fecha_desde.configure(
             fg_color=surface, border_color=border,
             text_color=text, placeholder_text_color=text_sec,
@@ -194,9 +199,10 @@ class ThemeManager:
         )
         app.lbl_estado.configure(text_color=text)
         app.lbl_escaneo.configure(text_color=text_sec)
+        app.lbl_version.configure(text_color=text_sec)
         app.lbl_tema.configure(text_color=text)
 
-        for attr in ("lbl_maquina", "lbl_desde", "lbl_hasta"):
+        for attr in ("lbl_maquina", "lbl_desde", "lbl_hasta", "lbl_tipo"):
             lbl = getattr(app, attr, None)
             if lbl:
                 lbl.configure(text_color=text)

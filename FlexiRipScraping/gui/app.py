@@ -29,6 +29,10 @@ TIPO_LABEL = {
     "inicio_impresion": "Inicio de Impresión",
 }
 
+TIPO_REVERSE = {v: k for k, v in TIPO_LABEL.items()}
+
+VERSION = "1.0.0"
+
 MAQUINAS = sorted(set(EMISOR_MAQUINAS.values()))
 
 
@@ -108,6 +112,15 @@ class App(ctk.CTk):
         self.entry_fecha_hasta = ctk.CTkEntry(self.frame_filtros, width=110, placeholder_text="AAAA-MM-DD")
         self.entry_fecha_hasta.pack(side="left", padx=(0, 10))
 
+        self.lbl_tipo = ctk.CTkLabel(self.frame_filtros, text="Tipo:")
+        self.lbl_tipo.pack(side="left", padx=(0, 5))
+        opciones_tipo = ["Todos", "Inicio de RIP", "Inicio de Impresión"]
+        self.combo_tipo = ctk.CTkComboBox(
+            self.frame_filtros, values=opciones_tipo, width=160, command=lambda _e: self.buscar(),
+        )
+        self.combo_tipo.set("Todos")
+        self.combo_tipo.pack(side="left", padx=(0, 15))
+
         self.lbl_tema = ctk.CTkLabel(self.frame_filtros, text="Tema:")
         self.lbl_tema.pack(side="left", padx=(20, 5))
 
@@ -163,6 +176,8 @@ class App(ctk.CTk):
         self.frame_estado.pack(fill="x", padx=10, pady=(0, 10))
         self.lbl_escaneo = ctk.CTkLabel(self.frame_estado, text="", anchor="w")
         self.lbl_escaneo.pack(side="left", padx=(0, 20))
+        self.lbl_version = ctk.CTkLabel(self.frame_estado, text=f"V. {VERSION}", anchor="center")
+        self.lbl_version.pack(side="left", expand=True)
         self.lbl_estado = ctk.CTkLabel(self.frame_estado, text="", anchor="e")
         self.lbl_estado.pack(side="right")
 
@@ -202,11 +217,14 @@ class App(ctk.CTk):
         fecha_desde = self.entry_fecha_desde.get().strip()
         fecha_hasta = self.entry_fecha_hasta.get().strip()
 
+        tipo_label = self.combo_tipo.get()
+        tipo = TIPO_REVERSE.get(tipo_label, "")
+
         self._busqueda_en_curso = True
         self.btn_buscar.configure(state="disabled")
 
         def _ejecutar():
-            filas = buscar(termino=termino, emisor=emisor, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+            filas = buscar(termino=termino, tipo=tipo, emisor=emisor, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
             self._programar(lambda: self._mostrar_resultados(filas))
 
         threading.Thread(target=_ejecutar, daemon=True).start()
