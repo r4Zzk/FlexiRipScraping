@@ -5,7 +5,6 @@ from pathlib import Path
 from parser.html_reader import cargar_html
 from parser.extractor import extraer_registros
 from parser.normalizer import normalizar
-from database.connection import crear_tabla
 from database.queries import guardar_registros
 from config import FUENTES
 
@@ -17,7 +16,6 @@ def sincronizar(fuentes=None, on_progreso=None):
     lecturas parciales si el archivo se está escribiendo.
     on_progreso(mensaje) se llama con el progreso de cada fuente.
     """
-    crear_tabla()
     fuentes = fuentes if fuentes is not None else FUENTES
 
     def _log(msg):
@@ -31,9 +29,8 @@ def sincronizar(fuentes=None, on_progreso=None):
             _log(f"No encontrado: {ruta}")
             continue
         _log(f"Leyendo {ruta.name}...")
+        tmp_path = Path(tempfile.mktemp(suffix=ruta.suffix))
         try:
-            with tempfile.NamedTemporaryFile(suffix=ruta.suffix, delete=False) as tmp:
-                tmp_path = Path(tmp.name)
             shutil.copy2(ruta, tmp_path)
             objetos = extraer_registros(cargar_html(tmp_path))
             objetos = normalizar(objetos)

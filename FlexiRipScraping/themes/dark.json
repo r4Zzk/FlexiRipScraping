@@ -1,0 +1,21 @@
+{
+  "treeview": {
+    "background": "#163832",
+    "foreground": "#DAF1DE",
+    "row_even_background": "#163832",
+    "row_odd_background": "#0B2B26",
+    "heading_background": "#235347",
+    "heading_foreground": "#F3E9D2",
+    "selected_background": "#397563",
+    "selected_foreground": "#F3E9D2",
+    "field_background": "#163832",
+    "border": "#235347",
+    "row_height": 28
+  },
+  "switch": {
+    "on": "#235347",
+    "off": "#B8A98A",
+    "button": "#F3E9D2",
+    "button_hover": "#DAF1DE"
+  }
+}

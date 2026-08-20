@@ -77,6 +77,8 @@ def a_segundos(texto):
         return None
     minutos = re.search(r"(\d+)\s*minutos?", texto)
     segundos = re.search(r"(\d+)\s*segundos?", texto)
+    if not minutos and not segundos:
+        return None
     total = 0
     if minutos:
         total += int(minutos.group(1)) * 60

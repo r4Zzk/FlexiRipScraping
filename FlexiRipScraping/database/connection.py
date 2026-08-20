@@ -28,7 +28,6 @@ CREATE TABLE IF NOT EXISTS registros (
 
 
 def obtener_conexion():
-    DATABASE_FILE.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(DATABASE_FILE)
     conn.row_factory = sqlite3.Row
     return conn

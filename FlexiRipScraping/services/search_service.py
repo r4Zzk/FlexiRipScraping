@@ -1,8 +1,8 @@
 from database.connection import obtener_conexion
 
 
-def buscar(termino="", tipo="", emisor="", fecha_desde="", fecha_hasta="", limite=9999):
-    """Busca registros con filtros opcionales."""
+def buscar(termino="", tipo="", emisor="", fecha_desde="", fecha_hasta=""):
+    """Busca registros con filtros opcionales. Devuelve lista de dicts."""
     conn = obtener_conexion()
     sql = "SELECT * FROM registros WHERE 1=1"
     params = []
@@ -27,8 +27,7 @@ def buscar(termino="", tipo="", emisor="", fecha_desde="", fecha_hasta="", limit
         sql += " AND fecha_inicio <= ?"
         params.append(fecha_hasta + " 23:59:59")
 
-    sql += " ORDER BY fecha_inicio DESC LIMIT ?"
-    params.append(limite)
+    sql += " ORDER BY fecha_inicio DESC"
 
     filas = conn.execute(sql, params).fetchall()
     conn.close()

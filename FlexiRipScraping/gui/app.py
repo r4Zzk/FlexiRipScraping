@@ -1,4 +1,6 @@
 import sys
+import threading
+import queue
 from tkinter import ttk
 
 import customtkinter as ctk
@@ -6,9 +8,9 @@ import customtkinter as ctk
 from config import FUENTES, resource_path, EMISOR_MAQUINAS
 from services.sync_service import sincronizar
 from services.search_service import buscar, contar
+from theme_manager import ThemeManager
 
 ctk.set_appearance_mode("dark")
-ctk.set_default_color_theme("blue")
 
 COLUMNAS = [
     ("fecha_inicio", "Fecha", 160),
@@ -37,19 +39,24 @@ class App(ctk.CTk):
         self.geometry("1300x650")
         self.minsize(900, 400)
 
+        self.theme = ThemeManager(self)
+        self._busqueda_en_curso = False
+        self._callbacks = queue.Queue()
+        self._poll_callbacks()
+
         self._cargar_icono()
         self._crear_barra_busqueda()
         self._crear_filtros()
         self._crear_tabla()
-        self.lbl_estado = ctk.CTkLabel(self, text="")
-        self.lbl_estado.pack(pady=(0, 10))
+        self._crear_barra_estado()
+
+        self.theme._aplicar()
 
     def _cargar_icono(self):
         png = resource_path("assets/icon.png")
         if png.exists():
             try:
                 import tkinter as tk
-
                 self._icono_tk = tk.PhotoImage(file=str(png))
                 self.iconphoto(True, self._icono_tk)
             except Exception:
@@ -62,58 +69,86 @@ class App(ctk.CTk):
                 pass
 
     def _crear_barra_busqueda(self):
-        frame = ctk.CTkFrame(self)
-        frame.pack(fill="x", padx=10, pady=(10, 0))
+        self.frame_busqueda = ctk.CTkFrame(self)
+        self.frame_busqueda.pack(fill="x", padx=10, pady=(10, 0))
 
         self.entry = ctk.CTkEntry(
-            frame,
+            self.frame_busqueda,
             placeholder_text="Buscar por archivo, impresora o estado...",
         )
         self.entry.pack(side="left", fill="x", expand=True, padx=(0, 10))
         self.entry.bind("<Return>", lambda _e: self.buscar())
 
-        self.btn_buscar = ctk.CTkButton(frame, text="Buscar", width=90, command=self.buscar)
+        self.btn_buscar = ctk.CTkButton(self.frame_busqueda, text="Buscar", width=90, command=self.buscar)
         self.btn_buscar.pack(side="left", padx=(0, 10))
 
-        self.btn_escanear = ctk.CTkButton(frame, text="Escanear", width=90, command=self.escanear)
+        self.btn_escanear = ctk.CTkButton(self.frame_busqueda, text="Escanear", width=90, command=self.escanear)
         self.btn_escanear.pack(side="left")
 
     def _crear_filtros(self):
-        frame = ctk.CTkFrame(self)
-        frame.pack(fill="x", padx=10, pady=(5, 0))
+        self.frame_filtros = ctk.CTkFrame(self)
+        self.frame_filtros.pack(fill="x", padx=10, pady=(5, 0))
 
-        ctk.CTkLabel(frame, text="Máquina:").pack(side="left", padx=(10, 5))
+        self.lbl_maquina = ctk.CTkLabel(self.frame_filtros, text="Máquina:")
+        self.lbl_maquina.pack(side="left", padx=(10, 5))
         opciones_maq = ["Todas"] + MAQUINAS
-        self.combo_maquina = ctk.CTkComboBox(frame, values=opciones_maq, width=130, command=lambda _e: self.buscar())
+        self.combo_maquina = ctk.CTkComboBox(
+            self.frame_filtros, values=opciones_maq, width=130, command=lambda _e: self.buscar(),
+        )
         self.combo_maquina.set("Todas")
         self.combo_maquina.pack(side="left", padx=(0, 15))
 
-        ctk.CTkLabel(frame, text="Desde:").pack(side="left", padx=(0, 5))
-        self.entry_fecha_desde = ctk.CTkEntry(frame, width=110, placeholder_text="AAAA-MM-DD")
+        self.lbl_desde = ctk.CTkLabel(self.frame_filtros, text="Desde:")
+        self.lbl_desde.pack(side="left", padx=(0, 5))
+        self.entry_fecha_desde = ctk.CTkEntry(self.frame_filtros, width=110, placeholder_text="AAAA-MM-DD")
         self.entry_fecha_desde.pack(side="left", padx=(0, 10))
 
-        ctk.CTkLabel(frame, text="Hasta:").pack(side="left", padx=(0, 5))
-        self.entry_fecha_hasta = ctk.CTkEntry(frame, width=110, placeholder_text="AAAA-MM-DD")
+        self.lbl_hasta = ctk.CTkLabel(self.frame_filtros, text="Hasta:")
+        self.lbl_hasta.pack(side="left", padx=(0, 5))
+        self.entry_fecha_hasta = ctk.CTkEntry(self.frame_filtros, width=110, placeholder_text="AAAA-MM-DD")
         self.entry_fecha_hasta.pack(side="left", padx=(0, 10))
 
-    def _crear_tabla(self):
-        frame = ctk.CTkFrame(self)
-        frame.pack(fill="both", expand=True, padx=10, pady=(5, 10))
+        self.lbl_tema = ctk.CTkLabel(self.frame_filtros, text="Tema:")
+        self.lbl_tema.pack(side="left", padx=(20, 5))
 
-        estilo = ttk.Style(self)
-        estilo.theme_use("clam")
-        estilo.configure("Treeview", rowheight=26, fieldbackground="#242424", background="#242424", foreground="white")
-        estilo.configure("Treeview.Heading", background="#333333", foreground="white")
+        self.switch_tema = ctk.CTkSwitch(
+            self.frame_filtros, text="",
+            onvalue="light", offvalue="dark",
+            command=self._cambiar_tema,
+        )
+        if self.theme.current == "light":
+            self.switch_tema.select()
+        self.switch_tema.pack(side="left")
+
+    def _cambiar_tema(self):
+        self.theme.toggle()
+
+    def _poll_callbacks(self):
+        try:
+            while True:
+                cb = self._callbacks.get_nowait()
+                cb()
+        except queue.Empty:
+            pass
+        self.after(50, self._poll_callbacks)
+
+    def _programar(self, callback):
+        """Encola un callback para ejecutar en el hilo principal."""
+        self._callbacks.put(callback)
+
+    def _crear_tabla(self):
+        self.frame_tabla = ctk.CTkFrame(self)
+        self.frame_tabla.pack(fill="both", expand=True, padx=10, pady=(5, 10))
 
         ids = [c[0] for c in COLUMNAS]
-        self.tabla = ttk.Treeview(frame, columns=ids, show="headings")
+        self.tabla = ttk.Treeview(self.frame_tabla, columns=ids, show="headings")
 
         for cid, texto, ancho in COLUMNAS:
             self.tabla.heading(cid, text=texto, command=lambda c=cid: self._ordenar_por(c))
             self.tabla.column(cid, width=ancho, anchor="w")
 
-        scroll_y = ttk.Scrollbar(frame, orient="vertical", command=self.tabla.yview)
-        scroll_x = ttk.Scrollbar(frame, orient="horizontal", command=self.tabla.xview)
+        scroll_y = ttk.Scrollbar(self.frame_tabla, orient="vertical", command=self.tabla.yview)
+        scroll_x = ttk.Scrollbar(self.frame_tabla, orient="horizontal", command=self.tabla.xview)
         self.tabla.configure(yscrollcommand=scroll_y.set, xscrollcommand=scroll_x.set)
 
         self.tabla.pack(side="left", fill="both", expand=True)
@@ -122,6 +157,14 @@ class App(ctk.CTk):
 
         self._orden_ascending = True
         self._orden_col = "fecha_inicio"
+
+    def _crear_barra_estado(self):
+        self.frame_estado = ctk.CTkFrame(self, fg_color="transparent")
+        self.frame_estado.pack(fill="x", padx=10, pady=(0, 10))
+        self.lbl_escaneo = ctk.CTkLabel(self.frame_estado, text="", anchor="w")
+        self.lbl_escaneo.pack(side="left", padx=(0, 20))
+        self.lbl_estado = ctk.CTkLabel(self.frame_estado, text="", anchor="e")
+        self.lbl_estado.pack(side="right")
 
     def _ordenar_por(self, col):
         if self._orden_col == col:
@@ -132,35 +175,52 @@ class App(ctk.CTk):
         self.buscar()
 
     def escanear(self):
-        self.lbl_estado.configure(text="Escaneando...")
+        self.lbl_escaneo.configure(text="Escaneando...")
+        self.btn_escanear.configure(state="disabled")
         self.update_idletasks()
 
-        def on_progreso(msg):
-            self.lbl_estado.configure(text=msg)
-            self.update_idletasks()
+        def _ejecutar():
+            try:
+                n = sincronizar(on_progreso=lambda msg: self._programar(lambda m=msg: self.lbl_escaneo.configure(text=m)))
+                self._programar(lambda: self.lbl_escaneo.configure(text=f"Último escaneo: {n} nuevos · Total en DB: {contar()}"))
+            except Exception as e:
+                msg = str(e)
+                self._programar(lambda: self.lbl_escaneo.configure(text=f"Error al escanear: {msg}"))
+            finally:
+                self._programar(lambda: self.btn_escanear.configure(state="normal"))
+            self._programar(self.buscar)
 
-        try:
-            n = sincronizar(on_progreso=on_progreso)
-            self.lbl_estado.configure(text=f"{n} registros leídos · Total en DB: {contar()}")
-        except Exception as e:
-            self.lbl_estado.configure(text=f"Error al escanear: {e}")
-        self.buscar()
+        threading.Thread(target=_ejecutar, daemon=True).start()
 
     def buscar(self):
+        if self._busqueda_en_curso:
+            return
+
         termino = self.entry.get().strip()
         maquina = self.combo_maquina.get()
         emisor = maquina if maquina != "Todas" else ""
         fecha_desde = self.entry_fecha_desde.get().strip()
         fecha_hasta = self.entry_fecha_hasta.get().strip()
 
-        filas = buscar(termino=termino, emisor=emisor, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+        self._busqueda_en_curso = True
+        self.btn_buscar.configure(state="disabled")
+
+        def _ejecutar():
+            filas = buscar(termino=termino, emisor=emisor, fecha_desde=fecha_desde, fecha_hasta=fecha_hasta)
+            self._programar(lambda: self._mostrar_resultados(filas))
+
+        threading.Thread(target=_ejecutar, daemon=True).start()
+
+    def _mostrar_resultados(self, filas):
+        self._busqueda_en_curso = False
+        self.btn_buscar.configure(state="normal")
 
         if self._orden_col and self._orden_col != "fecha_inicio":
             reverse = not self._orden_ascending
             filas.sort(key=lambda f: f.get(self._orden_col) or "", reverse=reverse)
 
         self.tabla.delete(*self.tabla.get_children())
-        for f in filas:
+        for i, f in enumerate(filas):
             valores = []
             for cid, _texto, _ancho in COLUMNAS:
                 v = f.get(cid)
@@ -171,7 +231,8 @@ class App(ctk.CTk):
                 else:
                     v = v or ""
                 valores.append(v)
-            self.tabla.insert("", "end", values=valores)
+            tag = "row_even" if i % 2 == 0 else "row_odd"
+            self.tabla.insert("", "end", values=valores, tags=(tag,))
 
         self.lbl_estado.configure(text=f"{len(filas)} resultados")
 
