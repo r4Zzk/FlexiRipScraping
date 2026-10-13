@@ -6,8 +6,8 @@ buscarlos desde una interfaz gráfica.
 
 ## Arquitectura
 
-- 4 máquinas de impresión generan su propio `RIPLOG.HTML` (se comparte por red, solo lectura).
-- La 5ª máquina corre esta app: lee cada RIPLOG por red, parsea los eventos, los normaliza
+- Cada Pc genera un `RIPLOG.HTML` (se comparte por red, solo lectura).
+- La máquina control corre esta app: lee cada RIPLOG por red, parsea los eventos, los normaliza
   y los guarda en SQLite. **Solo lectura**: no mueve ni borra los archivos de origen.
 - Los archivos se limpian/mueven manualmente en cada máquina cuando sea necesario.
 
@@ -64,40 +64,21 @@ Linux:    ~/.config/FlexiRipScraping/
 - Tabla `registros` con anti-duplicados: `UNIQUE(tipo, archivo, fecha_inicio)` + `INSERT OR IGNORE`
 - Índices: `archivo`, `fecha_envio`, `tipo`
 
-## Generar el `.exe` (en una PC con Windows)
 
-```
-pip install -r requirements.txt pyinstaller
-pyinstaller FlexiRipScraping.spec
-```
-
-Modo `onedir`: queda en `dist\FlexiRipScraping\FlexiRipScraping.exe`.
-Los assets se empaquetan y se resuelven con `resource_path()` (config.py).
-
-## Instalación en la máquina 5
+## Instalación en la máquina control
 
 ```
 C:\Program Files\FlexiRipScraping\
-└── FlexiRipScraping.exe          ← programa (no escribe nada acá)
+└── FlexiRipScraping.exe          
 
 C:\Users\Usuario\AppData\Local\FlexiRipScraping\
 ├── config.txt                    ← rutas de red + máquinas (editar a mano)
 └── database.db                   ← se crea sola
 ```
 
-### Configurar las 4 máquinas de impresión
+### Configurar las máquinas de impresión
 
 - Compartir la carpeta del RIPLOG (solo lectura).
 - Verificar desde la máquina 5: `\\MAQUINA1\...\RIPLOG.HTML`.
 - Editar `config.txt` con las 4 rutas UNC.
 
-### Probar
-
-- Doble clic en `FlexiRipScraping.exe` → "Escanear" → deberían aparecer los registros.
-- Al actualizar/desinstalar el programa, `config.txt` y `database.db` se conservan.
-
-## Dependencias
-
-`lxml`, `customtkinter` (ver `requirements.txt`).
-`sqlite3` es parte de la biblioteca estándar (no va en requirements).
-`pyinstaller` y `pillow` son herramientas de build/desarrollo (no las usa el usuario final).
